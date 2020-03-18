@@ -1,5 +1,6 @@
 import boto3
 import json
+import csv
 client = boto3.client('workspaces', region_name = 'us-west-2')
 paginator = client.get_paginator('describe_workspaces')
 
@@ -14,4 +15,5 @@ for workspace in [workspaces  for page in paginator.paginate() for workspaces in
     i = i + 1
     UserInfo = (workspace["UserName"], [tag['Value']  for tag in client.describe_tags(ResourceId = workspace["WorkspaceId"])["TagList"] if tag['Key'] in ['div', 'dept']])
     print (UserInfo, i)
+    
     
