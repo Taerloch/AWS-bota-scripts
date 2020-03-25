@@ -8,45 +8,53 @@ from time import sleep
 debug = True
 def get_Workspaces(client, userInfos):
     paginator = client.get_paginator('describe_workspaces')
+ 
 
-    i = 0
+    # do this rather than list comprehesion, because we need to grab the describe_workspaces_connection_status
+    for page in paginator.paginate():
+        # this builds the list of status
+        connections = client.describe_workspaces_connection_status(WorkspaceIds = [myworkspace["WorkspaceId"] for myworkspace in page.get("Workspaces")])
 
-    for workspace in [workspaces  for page in paginator.paginate() for workspaces in page["Workspaces"]]:
+        for workspace in [workspaces for workspaces in  page.get("Workspaces")]:
+            workspace_Id = workspace.get("WorkspaceId")
+            # PACCAR metadata is stored in tags, at this time I am only scraping division code
+            tags = client.describe_tags(ResourceId = workspace["WorkspaceId"])["TagList"]
+      
+            division = [tag.get("Value", 'na')  for tag in tags if tag['Key'] in ['div', 'Div']]
+            department = [tag.get("Value", 'na')  for tag in tags if tag['Key'] in ['dept', 'Dept']]
+            # This is the step that grabs data for the connections api
+            last_login = [workspaceCon.get('LastKnownUserConnectionTimestamp',
+                                           datetime.date(2030, 1, 1))
+                          for workspaceCon in connections.get(
+                              "WorkspacesConnectionStatus")
+                          if workspaceCon.get("WorkspaceId") == workspace_Id].pop()
+            
+            # print (last_login)
 
-        # PACCAR metadata is stored in tags, at this time I am only scraping division code
-        tags = client.describe_tags(ResourceId = workspace["WorkspaceId"])["TagList"]
-        sleep (0.01)
-        division = [tag.get("Value", 'na')  for tag in tags if tag['Key'] in ['div', 'Div']]
-        department = [tag.get("Value", 'na')  for tag in tags if tag['Key'] in ['dept', 'Dept']]
-        # Need to prune workstation that have not been used.
-        try:
-            last_login = client.describe_workspaces_connection_status(WorkspaceIds = [workspace["WorkspaceId"]]).get("WorkspacesConnectionStatus",[{"LastKnownUserConnectionTimestamp" : "1/1/2020"}]).pop().get('LastKnownUserConnectionTimestamp', datetime.date(2030, 1, 1))
-        except:
-            last_login = datetime.date(2030, 1, 1)
-        #TODO: add in the timestamp of observation. and the region and department
-        UserInfo = {
-            'WorkspaceId' :  workspace["WorkspaceId"],\
-            'UserName' : workspace.get("UserName", "NA"), \
-            'User-Region': client.meta.region_name,\
-            'Division' :  division[0] if division else "NA",\
-            'Department' :  department[0] if department else "NA",\
-            'Contractor' : 'A-' in workspace.get('UserName', "NA"),
-            'Auto-Provisioned' : ['True','true'] in [tag2['Value']  for tag2 in tags if tag2['Key'] in ['AutoProvision']],\
-            'ComputerName' :  workspace.get("ComputerName", "NA"), \
-            'IpAddress' : workspace.get("IpAddress", "NA"), \
-            'LastLogin' : last_login.strftime("%Y-%m-%d"),\
-            'LastUpdate' : datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            #TODO: add in the timestamp of observation. and the region and department
+            UserInfo = {
+                'WorkspaceId' :  workspace["WorkspaceId"],\
+                'UserName' : workspace.get("UserName", "NA"), \
+                'User-Region': client.meta.region_name,\
+                'Division' :  division[0] if division else "NA",\
+                'Department' :  department[0] if department else "NA",\
+                'Contractor' : 'A-' in workspace.get('UserName', "NA"),
+                'Auto-Provisioned' : ['True','true'] in [tag2['Value']  for tag2 in tags if tag2['Key'] in ['AutoProvision']],\
+                'ComputerName' :  workspace.get("ComputerName", "NA"), \
+                'IpAddress' : workspace.get("IpAddress", "NA"), \
+                'LastLogin' : last_login.strftime("%Y-%m-%d"),\
+                'LastUpdate' : datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-            }
+                }
 
 
-        if debug :
+            if debug :
 
-            print(UserInfo, end = '\r', flush = True)
+                print(UserInfo, end = '\r', flush = True)
 
 
-        userInfos.append(UserInfo)
-        putinDyn(UserInfo)
+            userInfos.append(UserInfo)
+            putinDyn(UserInfo)
 
 # step to add the user information to the Workspaces Table
 # dynamodb = boto3.resource('dynamodb', region_name='us-west-2', endpoint_url="http://localhost:8000")
