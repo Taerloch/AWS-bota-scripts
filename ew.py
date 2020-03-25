@@ -6,6 +6,10 @@ import sys
 from datetime import date
 from time import sleep
 debug = True
+'''
+this does what it says, gets the list of workspaces, their connection status for last login.
+And then gets the specific PACCAR tags for reporting.
+'''
 def get_Workspaces(client, userInfos):
     paginator = client.get_paginator('describe_workspaces')
  
@@ -23,12 +27,12 @@ def get_Workspaces(client, userInfos):
             division = [tag.get("Value", 'na')  for tag in tags if tag['Key'] in ['div', 'Div']]
             department = [tag.get("Value", 'na')  for tag in tags if tag['Key'] in ['dept', 'Dept']]
             # This is the step that grabs data for the connections api
-            last_login = [workspaceCon.get('LastKnownUserConnectionTimestamp',
+            last_login = {"last_login" : workspaceCon.get('LastKnownUserConnectionTimestamp',
                                            datetime.date(2030, 1, 1))
                           for workspaceCon in connections.get(
                               "WorkspacesConnectionStatus")
-                          if workspaceCon.get("WorkspaceId") == workspace_Id].pop()
-            
+                          if workspaceCon.get("WorkspaceId") == workspace_Id}
+            last_login = last_login.get("last_login", datetime.date(2030, 1, 1))
             # print (last_login)
 
             #TODO: add in the timestamp of observation. and the region and department
