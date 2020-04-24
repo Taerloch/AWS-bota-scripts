@@ -23,9 +23,16 @@ def get_Workspaces(client, userInfos):
             workspace_Id = workspace.get("WorkspaceId")
             # PACCAR metadata is stored in tags, at this time I am only scraping division code
             tags = client.describe_tags(ResourceId = workspace["WorkspaceId"])["TagList"]
-      
+
             division = [tag.get("Value", 'na')  for tag in tags if tag['Key'] in ['div', 'Div']]
             department = [tag.get("Value", 'na')  for tag in tags if tag['Key'] in ['dept', 'Dept']]
+            print([tag2.get('Value', 'false').lower()  for tag2 in tags if tag2.get('Key') in ['AutoProvision'] ])
+            autoprovision = 'true' in [tag2.get('Value', 'false').lower()  for tag2 in tags if tag2['Key'] in ['AutoProvision']]
+            # print(autoprovision)
+            # if autoprovision:
+            #     print ("skipping")
+            #     continue
+
             # This is the step that grabs data for the connections api
             last_login = {"last_login" : workspaceCon.get('LastKnownUserConnectionTimestamp',
                                            datetime.date(2030, 1, 1))
@@ -43,7 +50,7 @@ def get_Workspaces(client, userInfos):
                 'Division' :  division[0] if division else "NA",\
                 'Department' :  department[0] if department else "NA",\
                 'Contractor' : 'A-' in workspace.get('UserName', "NA"),
-                'Auto-Provisioned' : ['True','true'] in [tag2['Value']  for tag2 in tags if tag2['Key'] in ['AutoProvision']],\
+                'Auto-Provisioned' : autoprovision,\
                 'ComputerName' :  workspace.get("ComputerName", "NA"), \
                 'IpAddress' : workspace.get("IpAddress", "NA"), \
                 'LastLogin' : last_login.strftime("%Y-%m-%d"),\
@@ -69,7 +76,7 @@ def putinDyn(UserInfo):
 
 
 userInfos = []
-regionNames = ['us-west-2', 'eu-central-1', 'ap-southeast-2']
+regionNames = ['us-west-2' , 'eu-central-1', 'ap-southeast-2']
 for region in regionNames:
     get_Workspaces(boto3.client('workspaces', region_name=region), userInfos)
 
